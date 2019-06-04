@@ -10,6 +10,7 @@ library(car)
 library(Hmisc)
 library(lubridate)
 library(DescTools)
+library(EnvStats)
 #=============Load Data======================
 #Read both train and test data and combine them into a single csv file.
 t_train = read.csv('train.csv', na.strings = c("", '#N/A', '[]', '0'))
@@ -77,9 +78,7 @@ barplot(table(t_full$main_genre), main = "Movir Genre Frequency Plot", las = 2)
 # Number of Unique values of homepage
 length(unique(t_full$homepage))
 sum(is.na(t_full$homepage))
-myfun<-function(x) mean(is.na(x))*100
-apply(t_full[,c(colnames(t_full)[colSums(is.na(t_full)) > 0])],2,myfun) #Getting percentage of missing values in each variable
-# Since 
+
 sum(is.na(t_full$homepage))
 
 
@@ -286,3 +285,31 @@ ggplot(t_full[1:3000,], aes(x = as.factor(num_keywords), y = revenue, fill = as.
   geom_boxplot() + theme(legend.position = 'None')
 
 t_full$num_cast = str_count(t_full$cast, 'name')
+t_full$num_crew = str_count(t_full$crew, 'name')
+
+ggplot(t_full[1:3000,], aes(x = num_cast, y = revenue)) + geom_point() +
+  geom_smooth(method = 'lm', color = 'red', fill = 'red')
+
+ggplot(t_full[1:3000,], aes(x = num_crew, y = revenue)) + geom_point() +
+  geom_smooth(method = 'lm', color = 'red', fill = 'red')
+
+cor(t_full$revenue[1:3000], t_full$num_cast[1:3000], use = "complete.obs")
+cor(t_full$revenue[1:3000], t_full$num_crew[1:3000], use = "complete.obs")
+
+Skew(t_full$revenue[1:3000])
+hist(t_full$revenue[1:3000], breaks = 20)
+# As the target variable revenue is highly skewed we will normalise it
+symbox(t_full$revenue[1:3000], data = t_full, powers=c(3,2,1,0,-0.5,-1,-2))
+t_full$revenue_mod = log(t_full$revenue)
+Skew(t_full$revenue_mod[1:3000])
+hist(t_full$revenue_mod[1:3000], breaks = 20)
+
+sum(t_full$revenue[1:3000] == 0)
+boxcox(t_full$revenue[1:3000], c(-3,3), optimize = TRUE) # lambda = 0.1637742
+
+hist((t_full$revenue[1:3000]^0.164-1)/0.164)
+skewness((t_full$revenue[1:3000]^0.164-1)/0.164)
+t_full$revenue_mod = (t_full$revenue^0.164 - 1)/0.164
+
+myfun<-function(x) mean(is.na(x))*100
+apply(t_full[,c(colnames(t_full)[colSums(is.na(t_full)) > 0])],2,myfun) #Getting percentage of missing values in each variable
