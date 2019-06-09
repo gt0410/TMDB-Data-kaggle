@@ -535,6 +535,15 @@ full_data$release_month = as.factor(full_data$release_month)
 full_data$release_quarter = as.factor(full_data$release_quarter)
 full_data$release_week = as.factor(full_data$release_week)
 
+full_data$num_cast = as.factor(t_full$num_cast)
+full_data$num_crew = as.factor(t_full$num_crew)
+full_data$num_genres = as.numeric(full_data$num_genres)
+full_data$num_keywords = as.numeric(full_data$num_keywords)
+full_data$num_spoken_languages = as.factor(full_data$num_spoken_languages)
+
+full_data$revenue = t_full$revenue
+full_data$revenue_mod = NULL
+
 c_corr <- full_data[sapply(full_data[1:3000,], function(x) is.numeric(x))]
 corr_c <- cor(c_corr, use = "complete.obs")
 View(corr_c)
@@ -549,7 +558,11 @@ full_data$fc4 = NULL
 
 #Also, fc1 is highly correlated to fc5, so we remove fc1.
 full_data$fc1 = NULL
-
+full_data$fc2 = NULL
+full_data$fc5 = NULL
+full_data$num_cast = NULL
+full_data$num_crew = NULL
+full_data$num_spoken_languages = NULL
 #=========================Final Data Splitting==============================
 
 full_data$id = NULL
@@ -559,13 +572,13 @@ test_data = full_data[3001:nrow(full_data),]
 set.seed(99)
 #train_data = shuffle(train_data)
 
-test_data$revenue_mod = NULL
+test_data$revenue = NULL
 
-nearZeroVar(t_full)
+nearZeroVar(train_data, names = TRUE)
 
 #=======================Linear Regression=================================
 
-lm_fit = lm(revenue_mod~., train_data)
+lm_fit = lm(revenue~., train_data)
 summary(lm_fit)
 AIC(lm_fit) #13827.65
 BIC(lm_fit) #14494.35
@@ -590,6 +603,12 @@ ncvTest(lm_fit)
 
 plot(lm_fit$fitted.values, lm_fit$residuals)
 
+save(lm_fit,file =  "lm_fit.rda")
+
+predict_lm1 <- predict(lm_fit, test_data,ncomp = 1)
+predict_revenue = 10^predict_gbm1
+gbm_submission <- data.frame(id = t_test$ï..id, revenue = predict_revenue)
+write.csv(gbm_submission,"gbm_submission1.csv",row.names=FALSE)
 #=======================Gradient Boosting================================================
 train_control <- trainControl(method = "repeatedcv", number = 10, repeats = 5)
 
@@ -605,3 +624,35 @@ gbm_fit <- train(revenue_mod ~ ., data=train_data, distribution="gaussian", meth
 
 save(gbm_fit,file =  "gbm_fit.rda")
 
+predict_gbm <- predict(gbm_fit, train_data, ncomp = 3)
+plot(predict_gbm)
+postResample(pred = predict_gbm,obs = train_data$revenue_mod)
+
+predict_gbm1 <- predict(gbm_fit, test_data,ncomp = 1)
+predict_revenue = 10^predict_gbm1
+gbm_submission <- data.frame(id = t_test$ï..id, revenue = predict_revenue)
+write.csv(gbm_submission,"gbm_submission1.csv",row.names=FALSE)
+head(t_test$ï..id)
+#================================================================#
+
+caretGrid <- expand.grid(interaction.depth=c(1, 3, 5), n.trees = (0:50)*50,
+                         shrinkage=c(0.01, 0.001),
+                         n.minobsinnode=10)
+metric <- "RMSE"
+
+set.seed(99)
+gbm_fit1 <- train(revenue ~ ., data=train_data, distribution="gaussian", method="gbm",
+                 trControl=train_control, verbose=FALSE, 
+                 tuneGrid=caretGrid, metric=metric, bag.fraction=0.75)
+
+save(gbm_fit1,file =  "gbm_fit1.rda")
+
+predict_gbm1 <- predict(gbm_fit1, train_data, ncomp = 3)
+plot(predict_gbm1)
+postResample(pred = predict_gbm1,obs = train_data$revenue)
+
+predict_gbm2 <- predict(gbm_fit1, test_data,ncomp = 1)
+#predict_revenue = 10^predict_gbm1
+gbm_submission <- data.frame(id = t_test$ï..id, revenue = predict_gbm2)
+write.csv(gbm_submission,"gbm_submission2.csv",row.names=FALSE)
+head(t_test$ï..id)
